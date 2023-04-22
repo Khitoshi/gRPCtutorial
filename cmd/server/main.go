@@ -8,8 +8,9 @@ import (
 	"os"
 	"os/signal"
 
-	//TODOふぃあるのパス確認
-	hellopb "./pkg/grpc"
+	hellopb "grpctutorial/pkg/grpc"
+
+	"google.golang.org/grpc/reflection"
 
 	"google.golang.org/grpc"
 )
@@ -41,7 +42,11 @@ func main() {
 	//gRPCserverを作成
 	s := grpc.NewServer()
 
+	//gRPCサーバーにGreetingServiceを登録
 	hellopb.RegisterGreetingServiceServer(s, NewMyServer())
+
+	//serverリフレクションの設定
+	reflection.Register(s)
 
 	//作成したgRPCserverを稼働させる
 	go func() {
