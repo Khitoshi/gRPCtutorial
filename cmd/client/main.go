@@ -48,15 +48,21 @@ func main() {
 	client = hellopb.NewGreetingServiceClient(conn)
 
 	for {
+		fmt.Println("-1: exit")
 		fmt.Println("1: send Request")
 		fmt.Println("2: Server Stream")
-		fmt.Println("3: exit")
-		fmt.Println("please enter >>")
+		fmt.Println("3: Client Stream")
+		fmt.Printf("please enter >>")
 
 		scanner.Scan()
 		in := scanner.Text()
 
 		switch in {
+		case "-1":
+			fmt.Println("bye.")
+			//TODO gotoを消す
+			goto M
+
 		case "1":
 			hello()
 
@@ -64,14 +70,14 @@ func main() {
 			HelloServerStream()
 
 		case "3":
-			fmt.Println("bye.")
-			//TODO gotoを消す
-			goto M
+			HelloClientStream()
+
 		}
 	}
 M:
 }
 
+// Unary RPCがリクエストを送るところ
 func hello() {
 	fmt.Println("Pleace enter your name")
 	scanner.Scan()
@@ -90,6 +96,7 @@ func hello() {
 	}
 }
 
+// serverストリームがリクエストを複数送るところ
 func HelloServerStream() {
 	fmt.Println("Plase enter your name.")
 	scanner.Scan()
@@ -115,6 +122,41 @@ func HelloServerStream() {
 			fmt.Println(err)
 		}
 		fmt.Println(res)
+	}
+
+}
+
+// Client Stream RPCがリクエストを送るところ
+func HelloClientStream() {
+	// サーバーに複数回リクエストを送るためのストリームを得る
+	stream, err := client.HelloClientStream(context.Background())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	sendCount := 5
+	fmt.Printf("Please enter %v names.\n", sendCount)
+	// サーバーに送るリクエストを全て送信
+	for i := 0; i < sendCount; i++ {
+		scanner.Scan()
+		name := scanner.Text()
+
+		// ストリームを通じてリクエストを送信
+		if err := stream.Send(&hellopb.HelloRequest{
+			Name: name,
+		}); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	//ストリームからレスポンスを得る
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(res.GetMessage())
 	}
 
 }

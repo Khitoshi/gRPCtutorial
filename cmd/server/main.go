@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -44,6 +46,28 @@ func (s *myServer) HelloServerStream(req *hellopb.HelloRequest, stream hellopb.G
 		time.Sleep(time.Second * 1)
 	}
 	return nil
+}
+
+// Client Stream RPCがリクエストを受け取るところ
+func (s *myServer) HelloClientStream(stream hellopb.GreetingService_HelloClientStreamServer) error {
+	nameList := make([]string, 0)
+	for {
+
+		//streamのRecvメソッドを呼び出してリクエスト内容を取得する
+		req, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			//リクエストを全て受け取ったので纏めて返す!
+			message := fmt.Sprintf("Hello ,%v!", nameList)
+			return stream.SendAndClose(&hellopb.HelloResponse{
+				Message: message,
+			})
+		}
+
+		if err != nil {
+			return err
+		}
+		nameList = append(nameList, req.GetName())
+	}
 }
 
 // 自作サービス構造体のコンストラクタを定義
