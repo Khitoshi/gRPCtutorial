@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	hellopb "grpctutorial/pkg/grpc"
 
@@ -19,11 +20,30 @@ type myServer struct {
 	hellopb.UnimplementedGreetingServiceServer
 }
 
-// サービスメソッド
+// Unary RPCがレスポンスを返すところ
 func (m *myServer) Hello(ctx context.Context, req *hellopb.HelloRequest) (*hellopb.HelloResponse, error) {
+
+	// HelloResponse型を1つreturnする
+	// (Unaryなので、レスポンスを一つ返せば終わり)
 	return &hellopb.HelloResponse{
 		Message: fmt.Sprintf("hello %s", req.GetName()),
 	}, nil
+}
+
+// Server Stream RPCがレスポンスを返すところ
+func (s *myServer) HelloServerStream(req *hellopb.HelloRequest, stream hellopb.GreetingService_HelloServerStreamServer) error {
+	resCound := 5
+	for i := 0; i < resCound; i++ {
+		// streamのSendメソッドを使っている
+		if err := stream.Send(&hellopb.HelloResponse{
+			Message: fmt.Sprintf("[%d] Hello, %s!", i, req.GetName()),
+		}); err != nil {
+			return err
+		}
+		//1秒 待機
+		time.Sleep(time.Second * 1)
+	}
+	return nil
 }
 
 // 自作サービス構造体のコンストラクタを定義
