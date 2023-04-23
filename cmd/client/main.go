@@ -1,0 +1,84 @@
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	hellopb "grpctutorial/pkg/grpc"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+)
+
+var (
+	scanner *bufio.Scanner
+	client  hellopb.GreetingServiceClient
+)
+
+func main() {
+	//スタート時間・処理時間表示
+	startTime := time.Now()
+	fmt.Printf("client start\ttime: %v \n", startTime)
+	defer func() {
+		fmt.Printf("\n processing time: %v", time.Since(startTime).Milliseconds())
+	}()
+
+	//標準入力から文字列を受け取るスキャナを用意
+	scanner = bufio.NewScanner(os.Stdin)
+
+	//gRPCserverとのコネクションを確率
+	address := "localhost:8080"
+	conn, err := grpc.Dial(
+		address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		log.Fatalf("connection failed.")
+		return
+	}
+
+	//gRPCクライアントを作成
+	client = hellopb.NewGreetingServiceClient(conn)
+
+	for {
+		fmt.Println("1: send Request")
+		fmt.Println("2: exit")
+		fmt.Println("please enter >>")
+
+		scanner.Scan()
+		in := scanner.Text()
+
+		switch in {
+		case "1":
+			hello()
+
+		case "2":
+			fmt.Println("bye.")
+			//TODO gotoを消す
+			goto M
+		}
+	}
+M:
+}
+
+func hello() {
+	fmt.Println("Pleace enter your name")
+	scanner.Scan()
+	name := scanner.Text()
+
+	req := &hellopb.HelloRequest{
+		Name: name,
+	}
+
+	res, err := client.Hello(context.Background(), req)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(res.GetMessage())
+	}
+}
