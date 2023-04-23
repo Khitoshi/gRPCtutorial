@@ -208,10 +208,12 @@ func HelloBiStream() {
 			//受信
 			if res, err := stream.Recv(); err != nil {
 				if !errors.Is(err, io.EOF) {
+					//error内容を表示
 					fmt.Println(err)
 				}
 				recvEnd = true
 			} else {
+				//受信内容を表示
 				fmt.Println(res.GetMessage())
 			}
 		}

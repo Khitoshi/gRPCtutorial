@@ -85,9 +85,7 @@ func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsS
 		}); err != nil {
 			return nil
 		}
-
 	}
-
 }
 
 // 自作サービス構造体のコンストラクタを定義
