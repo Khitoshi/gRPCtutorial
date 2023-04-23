@@ -186,6 +186,7 @@ func HelloBiStream() {
 			name := scanner.Text()
 			sendCount++
 
+			//送信
 			if err := stream.Send(&hellopb.HelloRequest{
 				Name: name,
 			}); err != nil {
@@ -193,6 +194,7 @@ func HelloBiStream() {
 				sendEnd = true
 			}
 
+			//sendNum回行うと終了する
 			if sendCount == sendNum {
 				sendEnd = true
 				if err := stream.CloseSend(); err != nil {
@@ -203,6 +205,7 @@ func HelloBiStream() {
 
 		//受信処理
 		if !recvEnd {
+			//受信
 			if res, err := stream.Recv(); err != nil {
 				if !errors.Is(err, io.EOF) {
 					fmt.Println(err)
