@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	Interceptors "grpctutorial/cmd/client/Interceptor"
 	hellopb "grpctutorial/pkg/grpc"
 
 	"google.golang.org/grpc"
@@ -36,6 +37,7 @@ func main() {
 	address := "localhost:8080"
 	conn, err := grpc.Dial(
 		address,
+		grpc.WithUnaryInterceptor(Interceptors.MyUnaryClientInteceptor1),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
