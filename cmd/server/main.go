@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"time"
 
+	Interceptors "grpctutorial/cmd/server/Interceptor"
 	hellopb "grpctutorial/pkg/grpc"
 
 	"google.golang.org/grpc/reflection"
@@ -102,7 +103,7 @@ func main() {
 	}
 
 	//gRPCserverを作成
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.UnaryInterceptor(Interceptors.MyUnaryServerInterceptor1))
 
 	//gRPCサーバーにGreetingServiceを登録
 	hellopb.RegisterGreetingServiceServer(s, NewMyServer())
