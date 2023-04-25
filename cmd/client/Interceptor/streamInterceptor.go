@@ -14,13 +14,17 @@ func MyStreamClientInteceptor1(ctx context.Context, desc *grpc.StreamDesc, cc *g
 	log.Println("[pre] my stream client interceptor 1", method)
 
 	stream, err := streamer(ctx, desc, cc, method, opts...)
+
+	// 独自ストリームをクライアントに使わせる
 	return &myClientStreamWrapper1{stream}, err
 }
 
+// grpc.ClientStreamインターフェースを満たす独自構造体
 type myClientStreamWrapper1 struct {
 	grpc.ClientStream
 }
 
+// 送信処理//これらは自動で呼び出される
 func (s *myClientStreamWrapper1) SendMsg(m interface{}) error {
 	// リクエスト送信前に割り込ませる処理
 	log.Println("[pre message] my stream client interceptor 1: ", m)
