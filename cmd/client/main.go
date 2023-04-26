@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -93,8 +94,14 @@ func hello() {
 		Name: name,
 	}
 
+	//メタデータ
+	ctx := context.Background()
+	md := metadata.New(map[string]string{"type": "unary", "from": "client"})
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
 	// Helloメソッドの実行 -> HelloResponse型のレスポンスresを入手
-	res, err := client.Hello(context.Background(), req)
+	//res, err := client.Hello(context.Background(), req)
+	res, err := client.Hello(ctx, req)
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -169,7 +176,14 @@ func HelloClientStream() {
 
 // 双方性streaming
 func HelloBiStream() {
-	stream, err := client.HelloBiStreams(context.Background())
+	//メタデータ
+	ctx := context.Background()
+	// 新しいメタデータを作成し、キーと値のペアを設定します
+	md := metadata.New(map[string]string{"type": "stream", "from": "client"})
+	//ctxに格納
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	stream, err := client.HelloBiStreams(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return
