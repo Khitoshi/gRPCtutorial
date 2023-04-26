@@ -52,10 +52,12 @@ func (m *myServer) Hello(ctx context.Context, req *hellopb.HelloRequest) (*hello
 
 // Server Stream RPCがレスポンスを返すところ
 func (s *myServer) HelloServerStream(req *hellopb.HelloRequest, stream hellopb.GreetingService_HelloServerStreamServer) error {
+	//serverが送信する回数
 	resCound := 5
 	for i := 0; i < resCound; i++ {
 		// streamのSendメソッドを使っている
 		if err := stream.Send(&hellopb.HelloResponse{
+			//reqに送信されたデータが入っている
 			Message: fmt.Sprintf("[%d] Hello, %s!", i, req.GetName()),
 		}); err != nil {
 			return err
@@ -68,22 +70,23 @@ func (s *myServer) HelloServerStream(req *hellopb.HelloRequest, stream hellopb.G
 
 // Client Stream RPCがリクエストを受け取るところ
 func (s *myServer) HelloClientStream(stream hellopb.GreetingService_HelloClientStreamServer) error {
+	//受信した名前追加
 	nameList := make([]string, 0)
 	for {
-
 		//streamのRecvメソッドを呼び出してリクエスト内容を取得する
 		req, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
 			//リクエストを全て受け取ったので纏めて返す!
 			message := fmt.Sprintf("Hello ,%v!", nameList)
+			//送信して閉じる
 			return stream.SendAndClose(&hellopb.HelloResponse{
 				Message: message,
 			})
 		}
-
 		if err != nil {
 			return err
 		}
+		//名前のリストに新しい名前追加
 		nameList = append(nameList, req.GetName())
 	}
 }
@@ -94,15 +97,9 @@ func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsS
 		log.Println(md)
 	}
 
-	// (パターン1)すぐにヘッダーを送信したいならばこちら
-
+	//すぐにヘッダーを送信
 	headerMD := metadata.New(map[string]string{"type": "stream", "from": "server", "in": "header"})
 	if err := stream.SendHeader(headerMD); err != nil {
-		return err
-	}
-
-	// (パターン2)本来ヘッダーを送るタイミングで送りたいならばこちら
-	if err := stream.SetHeader(headerMD); err != nil {
 		return err
 	}
 
@@ -110,21 +107,28 @@ func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsS
 	trailerMD := metadata.New(map[string]string{"type": "stream", "from": "server", "in": "trailer"})
 	stream.SetTrailer(trailerMD)
 
-	for {
-		req, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			return nil
+	errChan := make(chan error, 1)
+	go func() {
+		for {
+			req, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				errChan <- nil
+				return
+			}
+			if err != nil {
+				errChan <- err
+				return
+			}
+			message := fmt.Sprintf("Hello, %v!", req.GetName())
+			if err := stream.Send(&hellopb.HelloResponse{
+				Message: message,
+			}); err != nil {
+				errChan <- nil
+				return
+			}
 		}
-		if err != nil {
-			return err
-		}
-		message := fmt.Sprintf("Hello, %v!", req.GetName())
-		if err := stream.Send(&hellopb.HelloResponse{
-			Message: message,
-		}); err != nil {
-			return nil
-		}
-	}
+	}()
+	return <-errChan
 }
 
 // 自作サービス構造体のコンストラクタを定義
