@@ -14,6 +14,7 @@ import (
 	Interceptors "grpctutorial/cmd/server/Interceptor"
 	hellopb "grpctutorial/pkg/grpc"
 
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
 	"google.golang.org/grpc"
@@ -25,6 +26,22 @@ type myServer struct {
 
 // Unary RPCがレスポンスを返すところ
 func (m *myServer) Hello(ctx context.Context, req *hellopb.HelloRequest) (*hellopb.HelloResponse, error) {
+	//ctxからメタデータを取得
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		log.Println(md)
+	}
+
+	//ヘッダーを作成
+	headerMD := metadata.New(map[string]string{"type": "unary", "from": "server", "in": "header"})
+	if err := grpc.SetHeader(ctx, headerMD); err != nil {
+		return nil, err
+	}
+
+	//トレイラーを作成
+	trailerMD := metadata.New(map[string]string{"type": "unary", "from": "server", "in": "trailer"})
+	if err := grpc.SetTrailer(ctx, trailerMD); err != nil {
+		return nil, err
+	}
 
 	// HelloResponse型を1つreturnする
 	// (Unaryなので、レスポンスを一つ返せば終わり)
@@ -72,6 +89,27 @@ func (s *myServer) HelloClientStream(stream hellopb.GreetingService_HelloClientS
 }
 
 func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsServer) error {
+	//ストリームのコンテキストからメタデータを取得
+	if md, ok := metadata.FromIncomingContext(stream.Context()); ok {
+		log.Println(md)
+	}
+
+	// (パターン1)すぐにヘッダーを送信したいならばこちら
+
+	headerMD := metadata.New(map[string]string{"type": "stream", "from": "server", "in": "header"})
+	if err := stream.SendHeader(headerMD); err != nil {
+		return err
+	}
+
+	// (パターン2)本来ヘッダーを送るタイミングで送りたいならばこちら
+	if err := stream.SetHeader(headerMD); err != nil {
+		return err
+	}
+
+	//トレイラー作成
+	trailerMD := metadata.New(map[string]string{"type": "stream", "from": "server", "in": "trailer"})
+	stream.SetTrailer(trailerMD)
+
 	for {
 		req, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
