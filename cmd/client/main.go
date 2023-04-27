@@ -87,9 +87,11 @@ M:
 // Unary RPCがリクエストを送るところ
 func hello() {
 	fmt.Println("Pleace enter your name")
+	//入力
 	scanner.Scan()
 	name := scanner.Text()
 
+	//serverのUnaryRPCを呼び出し
 	req := &hellopb.HelloRequest{
 		Name: name,
 	}
@@ -102,7 +104,6 @@ func hello() {
 	// Helloメソッドの実行 -> HelloResponse型のレスポンスresを入手
 	var header, trailer metadata.MD
 	res, err := client.Hello(ctx, req, grpc.Header(&header), grpc.Trailer(&trailer))
-
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -115,8 +116,10 @@ func hello() {
 // serverストリームがリクエストを複数送るところ
 func HelloServerStream() {
 	fmt.Println("Plase enter your name.")
+	//入力
 	scanner.Scan()
 	name := scanner.Text()
+	//serverのClientStreamRPCを呼び出し
 	req := &hellopb.HelloRequest{
 		Name: name,
 	}
@@ -143,79 +146,13 @@ func HelloServerStream() {
 		}
 	}()
 
+	//スレッド終了まで待機
 	<-sendDone
 }
 
-/*
-// Client Stream RPCがリクエストを送るところ
-
-	func HelloClientStream() {
-		// サーバーに複数回リクエストを送るためのストリームを得る
-		stream, err := client.HelloClientStream(context.Background())
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		//送信する回数
-		sendCount := 5
-		fmt.Printf("Please enter %v names.\n", sendCount)
-
-		//スレッド間のメッセージ用
-		sendDone := make(chan bool)
-		recvDone := make(chan bool)
-		finishedChannel := make(chan bool)
-		recvDone <- true
-
-		// サーバーに送るリクエストを全て送信
-		//送信
-		go func() {
-			for i := 0; i < sendCount; i++ {
-				<-recvDone
-				scanner.Scan()
-				name := scanner.Text()
-				// ストリームを通じてリクエストを送信
-				if err := stream.Send(&hellopb.HelloRequest{
-					Name: name,
-				}); err != nil {
-					fmt.Println(err)
-					return
-				}
-				sendDone <- true
-			}
-		}()
-
-		//受信
-		go func() {
-			defer close(finishedChannel)
-			//ストリームからレスポンスを得る
-			//受信
-			for {
-				//先にclientサイドからserverサイドに送信する為に待機する
-				<-sendDone
-				//ストリームからレスポンスを得る
-				res, err := stream.Recv()
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						//error内容を表示
-						fmt.Println(err)
-					}
-					break
-				} else {
-					//受信内容を表示
-					fmt.Println(res.GetMessage())
-				}
-				recvDone <- true
-			}
-
-		}()
-
-		<-finishedChannel
-	}
-*/
-
 // Client Stream RPCがリクエストを送るところ
 func HelloClientStream() {
+	//serverのClientStreamRPCと接続
 	stream, err := client.HelloClientStream(context.Background())
 	if err != nil {
 		fmt.Println(err)
@@ -226,12 +163,15 @@ func HelloClientStream() {
 
 	go func() {
 		defer close(sendDone)
+		//送信回数
 		sendCount := 5
 		fmt.Printf("Please enter %d names.\n", sendCount)
 		for i := 0; i < sendCount; i++ {
+			//入力
 			scanner.Scan()
 			name := scanner.Text()
 
+			//送信
 			if err := stream.Send(&hellopb.HelloRequest{
 				Name: name,
 			}); err != nil {
@@ -242,7 +182,10 @@ func HelloClientStream() {
 
 	}()
 
+	//スレッド終了まで待機
 	<-sendDone
+
+	//受信
 	res, err := stream.CloseAndRecv()
 	if err != nil {
 		fmt.Println(err)
@@ -260,18 +203,23 @@ func HelloBiStream() {
 	//ctxに格納
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
+	//serverの双方向ストリーミングRPCメソッドと接続
 	stream, err := client.HelloBiStreams(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	//送信回数
 	sendNum := 5
 	fmt.Printf("Please enter %d names.\n", sendNum)
 
+	//送信カウント
 	sendCount := 0
 
+	//送信時チャンネル
 	sendDone := make(chan bool)
+	//送信時チャンネル
 	recvDone := make(chan bool)
 
 	//送信処理
@@ -331,9 +279,11 @@ func HelloBiStream() {
 		}
 	}()
 
+	//トレーラー出力
 	trailerMD := stream.Trailer()
 	fmt.Println(trailerMD)
 
+	//チャンネルが両方閉じるまで待機
 	<-sendDone
 	<-recvDone
 }
