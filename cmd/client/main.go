@@ -100,8 +100,6 @@ func hello() {
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	// Helloメソッドの実行 -> HelloResponse型のレスポンスresを入手
-	//res, err := client.Hello(context.Background(), req)
-	//res, err := client.Hello(ctx, req)
 	var header, trailer metadata.MD
 	res, err := client.Hello(ctx, req, grpc.Header(&header), grpc.Trailer(&trailer))
 
@@ -127,56 +125,130 @@ func HelloServerStream() {
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	for {
-		//ストリームからレスポンスを得る
-		res, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			fmt.Println("all the responses have already received.")
-			break
+	sendDone := make(chan bool)
+	//受信
+	go func() {
+		defer close(sendDone)
+		for {
+			//ストリームからレスポンスを得る
+			res, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				fmt.Println("all the responses have already received.")
+				break
+			}
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(res)
 		}
+	}()
 
+	<-sendDone
+}
+
+/*
+// Client Stream RPCがリクエストを送るところ
+
+	func HelloClientStream() {
+		// サーバーに複数回リクエストを送るためのストリームを得る
+		stream, err := client.HelloClientStream(context.Background())
 		if err != nil {
 			fmt.Println(err)
+			return
 		}
-		fmt.Println(res)
-	}
 
-}
+		//送信する回数
+		sendCount := 5
+		fmt.Printf("Please enter %v names.\n", sendCount)
+
+		//スレッド間のメッセージ用
+		sendDone := make(chan bool)
+		recvDone := make(chan bool)
+		finishedChannel := make(chan bool)
+		recvDone <- true
+
+		// サーバーに送るリクエストを全て送信
+		//送信
+		go func() {
+			for i := 0; i < sendCount; i++ {
+				<-recvDone
+				scanner.Scan()
+				name := scanner.Text()
+				// ストリームを通じてリクエストを送信
+				if err := stream.Send(&hellopb.HelloRequest{
+					Name: name,
+				}); err != nil {
+					fmt.Println(err)
+					return
+				}
+				sendDone <- true
+			}
+		}()
+
+		//受信
+		go func() {
+			defer close(finishedChannel)
+			//ストリームからレスポンスを得る
+			//受信
+			for {
+				//先にclientサイドからserverサイドに送信する為に待機する
+				<-sendDone
+				//ストリームからレスポンスを得る
+				res, err := stream.Recv()
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						//error内容を表示
+						fmt.Println(err)
+					}
+					break
+				} else {
+					//受信内容を表示
+					fmt.Println(res.GetMessage())
+				}
+				recvDone <- true
+			}
+
+		}()
+
+		<-finishedChannel
+	}
+*/
 
 // Client Stream RPCがリクエストを送るところ
 func HelloClientStream() {
-	// サーバーに複数回リクエストを送るためのストリームを得る
 	stream, err := client.HelloClientStream(context.Background())
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	sendCount := 5
-	fmt.Printf("Please enter %v names.\n", sendCount)
-	// サーバーに送るリクエストを全て送信
-	for i := 0; i < sendCount; i++ {
-		scanner.Scan()
-		name := scanner.Text()
+	sendDone := make(chan bool)
 
-		// ストリームを通じてリクエストを送信
-		if err := stream.Send(&hellopb.HelloRequest{
-			Name: name,
-		}); err != nil {
-			fmt.Println(err)
-			return
+	go func() {
+		defer close(sendDone)
+		sendCount := 5
+		fmt.Printf("Please enter %d names.\n", sendCount)
+		for i := 0; i < sendCount; i++ {
+			scanner.Scan()
+			name := scanner.Text()
+
+			if err := stream.Send(&hellopb.HelloRequest{
+				Name: name,
+			}); err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
-	}
 
-	//ストリームからレスポンスを得る
+	}()
+
+	<-sendDone
 	res, err := stream.CloseAndRecv()
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		fmt.Println(res.GetMessage())
 	}
-
 }
 
 // 双方性streaming
@@ -197,37 +269,43 @@ func HelloBiStream() {
 	sendNum := 5
 	fmt.Printf("Please enter %d names.\n", sendNum)
 
-	var sendEnd, recvEnd bool
 	sendCount := 0
 
-	for !(sendEnd && recvEnd) {
+	sendDone := make(chan bool)
+	recvDone := make(chan bool)
 
-		//送信処理
-		if !sendEnd {
+	//送信処理
+	go func() {
+		defer close(sendDone)
+		for {
+			//入力
 			scanner.Scan()
 			name := scanner.Text()
 			sendCount++
-
 			//送信
 			if err := stream.Send(&hellopb.HelloRequest{
 				Name: name,
 			}); err != nil {
 				fmt.Println(err)
-				sendEnd = true
+				break
 			}
-
 			//sendNum回行うと終了する
 			if sendCount == sendNum {
-				sendEnd = true
 				if err := stream.CloseSend(); err != nil {
 					fmt.Println(err)
 				}
+				break
 			}
-		}
 
-		var headerMD metadata.MD
-		//受信処理
-		if !recvEnd {
+		}
+	}()
+
+	//受信処理
+	go func() {
+		defer close(recvDone)
+
+		for {
+			var headerMD metadata.MD
 			//ヘッダー情報が存在しない時
 			if headerMD == nil {
 				headerMD, err = stream.Header()
@@ -244,14 +322,18 @@ func HelloBiStream() {
 					//error内容を表示
 					fmt.Println(err)
 				}
-				recvEnd = true
+				break
 			} else {
 				//受信内容を表示
 				fmt.Println(res.GetMessage())
 			}
-		}
 
-		trailerMD := stream.Trailer()
-		fmt.Println(trailerMD)
-	}
+		}
+	}()
+
+	trailerMD := stream.Trailer()
+	fmt.Println(trailerMD)
+
+	<-sendDone
+	<-recvDone
 }
