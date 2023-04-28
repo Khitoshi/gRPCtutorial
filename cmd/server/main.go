@@ -18,6 +18,9 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"google.golang.org/grpc"
+
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type myServer struct {
@@ -149,6 +152,14 @@ func main() {
 		grpc.UnaryInterceptor(Interceptors.MyUnaryServerInterceptor1),
 		grpc.StreamInterceptor(Interceptors.MyStreamServerInterceptor1),
 	)
+
+	//ヘルスチェック
+	healthSrv := health.NewServer()
+	healthpb.RegisterHealthServer(s, healthSrv)
+	//mygrpcと呼ぶことでヘルスステータスを確認できる
+	healthSrv.SetServingStatus("mygrpc", healthpb.HealthCheckResponse_SERVING)
+	//空白の場合はエラーにする
+	healthSrv.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 
 	//gRPCサーバーにGreetingServiceを登録
 	hellopb.RegisterGreetingServiceServer(s, NewMyServer())
